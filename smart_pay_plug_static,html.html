@@ -1,0 +1,617 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SmartPayPlug - Smart Power Control</title>
+    <!-- Tailwind CSS Play CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    animation: {
+                        'float': 'float 6s ease-in-out infinite',
+                        'pulse-slow': 'pulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                    },
+                    keyframes: {
+                        float: {
+                            '0%, 100%': { transform: 'translateY(0)' },
+                            '50%': { transform: 'translateY(-20px)' },
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style type="text/css">
+        body {
+            font-family: 'Inter', sans-serif;
+            background: #0f172a;
+            color: white;
+            min-height: 100vh;
+        }
+
+        .text-gradient {
+            background: linear-gradient(to right, #38bdf8, #2563eb, #06b6d4);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .glass-card {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 1.5rem;
+            padding: 2rem;
+            transition: all 0.3s ease;
+        }
+
+        .glass-card-solid {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(8px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 1.5rem;
+            padding: 1.5rem;
+        }
+
+        .btn-glass {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(8px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            padding: 0.5rem 1.25rem;
+            border-radius: 0.75rem;
+            font-weight: 600;
+            transition: all 0.2s ease;
+        }
+
+        .btn-glass:hover {
+            background: rgba(255, 255, 255, 0.2);
+            transform: translateY(-2px);
+        }
+
+        .btn-gradient {
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .btn-gradient:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 10px 25px -5px rgba(56, 189, 248, 0.5);
+        }
+
+        .badge-warning {
+            background: #fbbf24;
+            color: #000;
+            font-weight: 800;
+            border-radius: 9999px;
+            box-shadow: 0 0 15px rgba(251, 191, 36, 0.5);
+        }
+
+        .glow-green { box-shadow: 0 0 30px rgba(34, 197, 94, 0.3); }
+        .glow-red { box-shadow: 0 0 30px rgba(239, 68, 68, 0.3); }
+        .glow-yellow { box-shadow: 0 0 30px rgba(251, 191, 36, 0.3); }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #1e293b; }
+        ::-webkit-scrollbar-thumb { background: #475569; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: #64748b; }
+    </style>
+</head>
+<body>
+    <div id="root">
+        <div style="height:100vh; display:flex; align-items:center; justify-content:center; flex-direction:column; background:#0f172a; color:white; font-family:sans-serif;">
+            <div style="width:40px; height:40px; border:4px solid #3b82f6; border-top-color:transparent; border-radius:50%; animate:spin 1s linear infinite;"></div>
+            <p style="margin-top:20px; color:#60a5fa; font-weight:600;">Initializing SmartPayPlug...</p>
+            <noscript><p style="color:#ef4444">Please enable JavaScript to run this app.</p></noscript>
+        </div>
+    </div>
+
+    <!-- UI Core Libraries (Stable CDNs) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js" crossorigin></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js" crossorigin></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js" crossorigin></script>
+    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js" crossorigin></script>
+    <script src="https://checkout.razorpay.com/v1/checkout.js" crossorigin></script>
+
+    <script>
+        // Emergency Debugger: If the app doesn't load in 5 seconds, check why
+        window.addEventListener('load', () => {
+            setTimeout(() => {
+                const root = document.getElementById('root');
+                if (root && root.innerHTML === "") {
+                    console.error("App failed to mount. Checking dependencies...");
+                    const deps = { 
+                        'React': typeof React !== 'undefined', 
+                        'ReactDOM': typeof ReactDOM !== 'undefined', 
+                        'Babel': typeof Babel !== 'undefined',
+                        'Razorpay': typeof Razorpay !== 'undefined'
+                    };
+                    console.table(deps);
+                    if (Object.values(deps).some(v => !v)) {
+                        root.innerHTML = `<div style="padding:20px; color:white; text-align:center;">
+                            <h2 style="color:#ef4444">⚠️ Connection Error</h2>
+                            <p>Some libraries failed to load. Please check your internet or refresh.</p>
+                        </div>`;
+                    }
+                }
+            }, 5000);
+        });
+    </script>
+
+    <script type="text/babel">
+        const { useState, useEffect, useCallback, useMemo, useRef } = React;
+
+        // --- Database Helpers ---
+        const DB_KEY = 'smartpayplug_data';
+        const getDB = () => {
+            try {
+                const data = localStorage.getItem(DB_KEY);
+                return data ? JSON.parse(data) : { transactions: [], activeSessions: {} };
+            } catch (e) {
+                console.warn("Storage access failed:", e);
+                return { transactions: [], activeSessions: {} };
+            }
+        };
+        const saveDB = (data) => {
+            try {
+                localStorage.setItem(DB_KEY, JSON.stringify(data));
+            } catch (e) {
+                console.error("Save failed:", e);
+            }
+        };
+
+        const PRICING_PLANS = [
+            { amount: 10, duration: 10, relay: 1, title: 'Basic Power', description: 'Quick 10-second charge', icon: '⚡', gradient: 'from-sky-400 via-blue-400 to-cyan-400', popular: false },
+            { amount: 20, duration: 20, relay: 2, title: 'Standard Power', description: 'Moderate 20-second session', icon: '⚡⚡', gradient: 'from-blue-500 via-sky-500 to-cyan-500', popular: true },
+            { amount: 50, duration: 60, relay: 3, title: 'Premium Power', description: 'Extended 60-second charge', icon: '⚡⚡⚡', gradient: 'from-blue-600 via-sky-600 to-cyan-600', popular: false }
+        ];
+
+        // --- Components ---
+        const QRCodeElement = ({ value, className }) => {
+            const canvasRef = React.useRef(null);
+            useEffect(() => {
+                if (canvasRef.current && window.QRCode) {
+                    window.QRCode.toCanvas(canvasRef.current, value, {
+                        width: 180,
+                        margin: 2,
+                        color: { dark: '#1e40af', light: '#ffffff' }
+                    }, (error) => {
+                        if (error) console.error("QR Error:", error);
+                    });
+                }
+            }, [value]);
+            return <canvas ref={canvasRef} className={className} />;
+        };
+
+        const API_URL = 'http://localhost:5001'; // Update to your backend URL if different
+
+        const Home = ({ onNavigate }) => {
+            const [sessions, setSessions] = useState(getDB().activeSessions);
+            const [activating, setActivating] = useState(null);
+            const [showSuccess, setShowSuccess] = useState(null);
+            const [currentOrder, setCurrentOrder] = useState(null);
+            const [isPolling, setIsPolling] = useState(false);
+
+            // Tick countdown
+            useEffect(() => {
+                const interval = setInterval(() => {
+                    setSessions(prev => {
+                        const next = { ...prev };
+                        let changed = false;
+                        
+                        Object.keys(next).forEach(id => {
+                            if (next[id].remainingTime > 0) {
+                                next[id] = { 
+                                    ...next[id], 
+                                    remainingTime: next[id].remainingTime - 1 
+                                };
+                                if (next[id].remainingTime <= 0) {
+                                    delete next[id];
+                                }
+                                changed = true;
+                            } else {
+                                delete next[id];
+                                changed = true;
+                            }
+                        });
+
+                        if (changed) {
+                            const db = getDB();
+                            db.activeSessions = next;
+                            saveDB(db);
+                            return next;
+                        }
+                        return prev;
+                    });
+                }, 1000);
+                return () => clearInterval(interval);
+            }, []);
+
+            // Polling for payment status
+            useEffect(() => {
+                let pollInterval;
+                if (isPolling && currentOrder) {
+                    pollInterval = setInterval(async () => {
+                        try {
+                            const response = await fetch(`${API_URL}/api/check-payment-status?transactionId=${currentOrder.transactionId}&orderId=${currentOrder.orderId}`);
+                            const data = await response.json();
+                            
+                            if (data.success && data.paid) {
+                                setIsPolling(false);
+                                handlePaymentSuccess(data.transaction);
+                            }
+                        } catch (err) {
+                            console.error("Polling error:", err);
+                        }
+                    }, 3000);
+                }
+                return () => clearInterval(pollInterval);
+            }, [isPolling, currentOrder]);
+
+            const handlePaymentSuccess = (transaction) => {
+                const newSession = {
+                    id: transaction.id,
+                    amount: transaction.amount,
+                    duration: transaction.duration,
+                    remainingTime: transaction.duration,
+                    startTime: transaction.startTime || new Date().toISOString(),
+                    relay: transaction.port
+                };
+
+                setSessions(prev => ({
+                    ...prev,
+                    [transaction.port]: newSession
+                }));
+
+                const db = getDB();
+                db.activeSessions[transaction.port] = newSession;
+                db.transactions.unshift({
+                    id: 'TXN_' + transaction.id,
+                    amount: transaction.amount,
+                    output_port: transaction.port,
+                    duration_seconds: transaction.duration,
+                    payment_status: 'SUCCESS',
+                    created_at: new Date().toISOString()
+                });
+                saveDB(db);
+
+                setShowSuccess(newSession);
+                setCurrentOrder(null);
+            };
+
+            const ESP32_IP = "172.25.16.135"; // 👈 REPLACE THIS WITH YOUR ESP32's ACTUAL IP ADDRESS
+            const RAZORPAY_KEY = "rzp_test_SPAkx85Ld7v76h";
+
+            const handleActivate = (plan) => {
+                setActivating(plan.amount);
+                
+                const options = {
+                    "key": RAZORPAY_KEY,
+                    "amount": plan.amount * 100, // paise
+                    "currency": "INR",
+                    "name": "SmartPayPlug",
+                    "description": `Activate ${plan.title} - ${plan.duration}s`,
+                    "image": "https://img.icons8.com/isometric/50/flash-on.png",
+                    "handler": function (response){
+                        // This runs AUTOMATICALLY after successful payment
+                        handlePaymentSuccess({
+                            id: response.razorpay_payment_id,
+                            amount: plan.amount,
+                            duration: plan.duration,
+                            port: plan.relay
+                        });
+
+                        // Attempt to trigger ESP32 directly
+                        fetch(`http://${ESP32_IP}/relay`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            mode: 'no-cors', // Common for local ESP32 requests
+                            body: JSON.stringify({
+                                relay: plan.relay,
+                                state: "ON",
+                                duration: plan.duration
+                            })
+                        }).catch(err => console.log("ESP32 Local trigger failed (likely browser security):", err));
+                    },
+                    "prefill": {
+                        "name": "User",
+                        "contact": ""
+                    },
+                    "theme": {
+                        "color": "#2563eb"
+                    },
+                    "modal": {
+                        "ondismiss": function(){
+                            setActivating(null);
+                        }
+                    }
+                };
+
+                const rzp1 = new window.Razorpay(options);
+                rzp1.open();
+            };
+
+            const getQrValue = (p) => {
+                // If we have an active order for this plan, use its real UPI URL
+                if (currentOrder && currentOrder.plan.amount === p.amount) {
+                    return currentOrder.upiUrl;
+                }
+                
+                // Otherwise show static fallback (or nothing until clicked)
+                const pa = "ajayajay1910206@oksbi";
+                const pn = "Ajay";
+                const am = p.amount;
+                const tn = encodeURIComponent(`Power_${p.duration}s`);
+                const tr = `SPP${Date.now()}`;
+                return `upi://pay?pa=${pa}&pn=${encodeURIComponent(pn)}&am=${am}&tn=${tn}&tr=${tr}&cu=INR&mc=5411`;
+            };
+
+            return (
+                <div className="container mx-auto px-4 py-12 text-center">
+                    {/* Hero */}
+                    <div className="max-w-4xl mx-auto mb-16">
+                        <h2 className="text-5xl md:text-7xl font-extrabold text-white mb-6 drop-shadow-2xl animate-float">
+                            Instant Smart Power<br />
+                            <span className="text-4xl md:text-5xl opacity-90">Pay. Power. Plug.</span>
+                        </h2>
+                        <p className="text-xl md:text-2xl text-blue-200 mb-8 drop-shadow-lg">
+                            Scan any UPI app 📱 Pay ₹10, ₹20, or ₹50 ⚡ Get power instantly
+                        </p>
+                    </div>
+
+                    {/* Success Banner */}
+                    {showSuccess && (
+                        <div className="max-w-2xl mx-auto mb-12">
+                            <div className="glass-card border-green-500/50 glow-green animate-bounce">
+                                <div className="text-6xl mb-4">✅</div>
+                                <h3 className="text-3xl font-bold text-white mb-2">Payment Confirmed!</h3>
+                                <p className="text-green-400 font-medium mb-6">
+                                    Power is now ACTIVE for {showSuccess.duration} seconds on Relay {showSuccess.relay}
+                                </p>
+                                <button onClick={() => setShowSuccess(null)} className="btn-glass text-sm">Dismiss</button>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Pricing Cards */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-6xl mx-auto">
+                        {PRICING_PLANS.map(plan => {
+                            const activeSession = sessions[plan.relay];
+                            const isActivating = activating === plan.amount;
+
+                            return (
+                                <div key={plan.amount} className={`relative flex flex-col ${plan.popular ? 'scale-105 z-10' : ''}`}>
+                                    {plan.popular && (
+                                        <div className="absolute -top-4 left-1/2 -translate-x-1/2 z-20">
+                                            <span className="badge-warning px-4 py-1 text-xs">⭐ MOST POPULAR</span>
+                                        </div>
+                                    )}
+                                    
+                                    <div className={`glass-card flex-1 flex flex-col items-center border-t-4 border-blue-400 shadow-xl ${activeSession ? 'opacity-90' : ''}`}>
+                                        <div className="text-6xl mb-4 animate-float" style={{ animationDelay: `${plan.amount * 0.1}s` }}>{plan.icon}</div>
+                                        <h3 className="text-2xl font-bold mb-1">{plan.title}</h3>
+                                        <p className="text-blue-200/70 text-sm mb-6">{plan.description}</p>
+                                        
+                                        <div className={`mb-8 p-1 rounded-2xl bg-gradient-to-r ${plan.gradient}`}>
+                                            <div className="bg-white/90 text-slate-900 px-6 py-3 rounded-xl">
+                                                <span className="text-4xl font-extrabold">₹{plan.amount}</span>
+                                                <span className="text-slate-500 ml-2 font-medium">/ {plan.duration}s</span>
+                                            </div>
+                                        </div>
+
+                                        {activeSession ? (
+                                            <div className="w-full">
+                                                <div className="bg-green-500/20 border border-green-500/40 rounded-2xl p-6 mb-4 text-center">
+                                                    <div className="text-sm font-bold text-green-400 uppercase tracking-widest mb-1">Active Now</div>
+                                                    <div className="text-5xl font-extrabold text-white mb-3">{activeSession.remainingTime}s</div>
+                                                    <div className="w-full bg-white/10 h-2 rounded-full overflow-hidden">
+                                                        <div className="bg-green-500 h-full transition-all duration-1000" style={{ width: `${(activeSession.remainingTime / activeSession.duration) * 100}%` }}></div>
+                                                    </div>
+                                                </div>
+                                                <div className="text-xs text-blue-200/50">Device Busy. Please wait.</div>
+                                            </div>
+                                        ) : (
+                                            <div className="w-full flex flex-col items-center">
+                                                <div className="bg-white p-3 rounded-2xl shadow-inner mb-4 border-4 border-blue-900/20">
+                                                    <QRCodeElement value={getQrValue(plan)} />
+                                                </div>
+                                                <div className="flex gap-2 mb-6">
+                                                    <a 
+                                                        href={getQrValue(plan)}
+                                                        className="px-4 py-2 bg-blue-600/20 hover:bg-blue-600/30 text-blue-400 rounded-lg text-xs font-bold transition-all border border-blue-500/30"
+                                                    >
+                                                        📱 Open in App
+                                                    </a>
+                                                </div>
+                                                <div className="text-xs text-blue-200/60 mb-8 max-w-[200px]">
+                                                    Scan with Google Pay, PhonePe, or Paytm
+                                                </div>
+                                                
+                                                <button 
+                                                    onClick={() => handleActivate(plan)}
+                                                    disabled={isActivating}
+                                                    className={`w-full py-4 rounded-xl font-extrabold text-white uppercase tracking-wider transition-all btn-gradient bg-gradient-to-r ${plan.gradient}`}
+                                                >
+                                                    {isActivating ? '⌛ Processing...' : `✅ I've Paid ₹${plan.amount}`}
+                                                </button>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            )
+                        })}
+                    </div>
+
+                    {/* Features footer */}
+                    <div className="mt-24 grid grid-cols-2 md:grid-cols-4 gap-8 max-w-4xl mx-auto opacity-80">
+                        <div className="flex flex-col items-center"><span className="text-4xl mb-2">⚡</span><p className="font-bold">Instant On</p></div>
+                        <div className="flex flex-col items-center"><span className="text-4xl mb-2">📱</span><p className="font-bold">UPI Payments</p></div>
+                        <div className="flex flex-col items-center"><span className="text-4xl mb-2">🛡️</span><p className="font-bold">Safe & Secure</p></div>
+                        <div className="flex flex-col items-center"><span className="text-4xl mb-2">⏱️</span><p className="font-bold">Auto-Off</p></div>
+                    </div>
+                </div>
+            );
+        };
+
+        const Admin = ({ onNavigate }) => {
+            const db = getDB();
+            const txns = db.transactions;
+            
+            const stats = useMemo(() => {
+                const totalRev = txns.reduce((sum, t) => sum + t.amount, 0);
+                const activeCount = Object.keys(db.activeSessions).length;
+                return {
+                    totalTransactions: txns.length,
+                    totalRevenue: totalRev,
+                    activePorts: activeCount,
+                    successRate: txns.length > 0 ? (txns.filter(t => t.payment_status === 'SUCCESS').length / txns.length * 100).toFixed(1) : 0
+                };
+            }, [txns]);
+
+            const clearLogs = () => {
+                if(confirm('Clear all logs?')) {
+                    localStorage.setItem(DB_KEY, JSON.stringify({ transactions: [], activeSessions: {} }));
+                    window.location.reload();
+                }
+            };
+
+            return (
+                <div className="container mx-auto px-4 py-8">
+                    <div className="flex flex-col md:flex-row justify-between items-end mb-8 gap-4">
+                        <div>
+                            <h2 className="text-4xl font-extrabold text-gradient">Admin Dashboard</h2>
+                            <p className="text-blue-200/60 font-medium">System telemetry and transaction history</p>
+                        </div>
+                        <button onClick={clearLogs} className="text-red-400 text-sm font-bold hover:underline mb-2">Clear History Data</button>
+                    </div>
+
+                    {/* Stats Grid */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
+                        <div className="glass-card shadow-lg border-l-4 border-blue-500 !p-6">
+                            <div className="text-blue-200/50 text-xs font-bold uppercase tracking-wider mb-1">Total Sales</div>
+                            <div className="text-4xl font-black">₹{stats.totalRevenue}</div>
+                        </div>
+                        <div className="glass-card shadow-lg border-l-4 border-purple-500 !p-6">
+                            <div className="text-blue-200/50 text-xs font-bold uppercase tracking-wider mb-1">Payments</div>
+                            <div className="text-4xl font-black">{stats.totalTransactions}</div>
+                        </div>
+                        <div className="glass-card shadow-lg border-l-4 border-green-500 !p-6">
+                            <div className="text-blue-200/50 text-xs font-bold uppercase tracking-wider mb-1">Active Now</div>
+                            <div className="text-4xl font-black">{stats.activePorts}</div>
+                        </div>
+                        <div className="glass-card shadow-lg border-l-4 border-emerald-500 !p-6">
+                            <div className="text-blue-200/50 text-xs font-bold uppercase tracking-wider mb-1">Success Rate</div>
+                            <div className="text-4xl font-black">{stats.successRate}%</div>
+                        </div>
+                    </div>
+
+                    {/* Table */}
+                    <div className="glass-card !p-0 overflow-hidden shadow-2xl border border-white/10">
+                        <div className="bg-white/5 p-6 border-b border-white/10 flex justify-between items-center">
+                            <h3 className="text-xl font-bold">Recent Activity</h3>
+                            <span className="bg-blue-500/20 text-blue-400 px-3 py-1 rounded-full text-xs font-bold">Live Updates</span>
+                        </div>
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-left">
+                                <thead className="bg-white/5 text-blue-200/40 text-[10px] font-bold uppercase tracking-widest">
+                                    <tr>
+                                        <th className="px-6 py-4">Transaction ID</th>
+                                        <th className="px-6 py-4">Amount</th>
+                                        <th className="px-6 py-4">Relay</th>
+                                        <th className="px-6 py-4">Duration</th>
+                                        <th className="px-6 py-4">Status</th>
+                                        <th className="px-6 py-4">Created At</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-white/5">
+                                    {txns.length === 0 ? (
+                                        <tr>
+                                            <td colSpan="6" className="px-6 py-12 text-center text-blue-200/30 font-medium italic">No activity recorded yet</td>
+                                        </tr>
+                                    ) : (
+                                        txns.map(t => (
+                                            <tr key={t.id} className="hover:bg-white/5 transition-colors">
+                                                <td className="px-6 py-4 font-mono text-xs text-blue-300">{t.id}</td>
+                                                <td className="px-6 py-4 font-bold text-green-400">₹{t.amount}</td>
+                                                <td className="px-6 py-4 text-sm font-bold">Port {t.output_port}</td>
+                                                <td className="px-6 py-4 text-sm">{t.duration_seconds}s</td>
+                                                <td className="px-6 py-4">
+                                                    <span className="bg-green-500/20 text-green-400 px-2 py-0.5 rounded-md text-[10px] font-bold border border-green-500/20">SUCCESS</span>
+                                                </td>
+                                                <td className="px-6 py-4 text-xs text-blue-200/50">{new Date(t.created_at).toLocaleString()}</td>
+                                            </tr>
+                                        ))
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        const App = () => {
+            const [view, setView] = useState('home');
+
+            return (
+                <div className="min-h-screen relative">
+                    {/* Floating Background Effects */}
+                    <div className="fixed inset-0 overflow-hidden pointer-events-none z-0">
+                        <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-blue-600/20 rounded-full blur-[120px] animate-pulse-slow"></div>
+                        <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-cyan-600/20 rounded-full blur-[120px] animate-pulse-slow" style={{ animationDelay: '2s' }}></div>
+                    </div>
+
+                    {/* Navigation */}
+                    <header className="relative z-10 mx-auto max-w-7xl px-4 pt-6">
+                        <div className="glass-card !p-4 flex flex-col sm:flex-row justify-between items-center gap-4">
+                            <div className="flex items-center gap-3 cursor-pointer" onClick={() => setView('home')}>
+                                <div className="bg-blue-600 text-white w-10 h-10 rounded-xl flex items-center justify-center font-black text-2xl shadow-lg shadow-blue-600/40">⚡</div>
+                                <h1 className="text-2xl font-black text-gradient tracking-tight">SmartPayPlug</h1>
+                            </div>
+                            <nav className="flex gap-2">
+                                <button 
+                                    onClick={() => setView('home')} 
+                                    className={`px-6 py-2 rounded-xl text-sm font-bold transition-all ${view === 'home' ? 'bg-blue-600 text-white shadow-lg' : 'text-blue-200/60 hover:text-white hover:bg-white/5'}`}
+                                >
+                                    Home
+                                </button>
+                                <button 
+                                    onClick={() => setView('admin')} 
+                                    className={`px-6 py-2 rounded-xl text-sm font-bold transition-all ${view === 'admin' ? 'bg-purple-600 text-white shadow-lg' : 'text-purple-200/60 hover:text-white hover:bg-white/5'}`}
+                                >
+                                    Admin
+                                </button>
+                            </nav>
+                        </div>
+                    </header>
+
+                    {/* View Context */}
+                    <main className="relative z-10">
+                        {view === 'home' ? <Home onNavigate={setView} /> : <Admin onNavigate={setView} />}
+                    </main>
+
+                    {/* Footer */}
+                    <footer className="relative z-10 py-12 text-center text-blue-200/20 text-xs font-medium tracking-widest uppercase">
+                        &copy; 2026 SmartPayPlug Official Development Build
+                    </footer>
+                </div>
+            );
+        };
+
+        const rootElement = document.getElementById('root');
+        if (rootElement) {
+            const root = ReactDOM.createRoot(rootElement);
+            root.render(<App />);
+        } else {
+            console.error("Root element not found!");
+        }
+    </script>
+</body>
+</html>
